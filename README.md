@@ -181,7 +181,7 @@ You can try **SuperbulletFrameworkV1-Knit** in three ways:
 
 3. **Roblox Place File**
    Quick start inside Roblox Studio. Import and explore immediately.
-   👉 [Roblox Place File](https://www.roblox.com/library/PLACE_ID/SuperbulletFrameworkV1-Knit)
+   👉 `SuperbulletFrameworkV1-Knit.rbxl` of this repositoroy.
 
 ⚡ Pick whichever fits your workflow — the **Superbullet App** is the easiest, while **GitHub + Roblox Place** give you raw access for tinkering.
 
