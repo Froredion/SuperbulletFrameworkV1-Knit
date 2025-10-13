@@ -90,6 +90,49 @@ Battle‑tested across ModuleScripts, Scripts, LocalScripts, and Knit Controller
 
 ---
 
+## Design Philosophy: Built for Beginners First
+
+### Why We Chose Knit: It Solves Cyclical Dependencies
+
+One of the biggest problems beginners face is **cyclical dependencies** — when two modules try to require each other, causing confusing errors that leave developers stuck.
+
+**Why this matters:**
+
+- New developers don't understand how to connect 2 different modules safely
+- Cyclical dependency errors are cryptic and frustrating
+- This single issue stops beginners from progressing
+
+**Knit solves this problem** through its service-based architecture, where services can safely reference each other through `GetService()` without creating circular requires.
+
+**That's why we chose to stick with Knit** — it fundamentally solves the connection problem that confuses beginners, and we built on top of it to make it even more accessible with:
+
+- Clearer error messages that teach, not just report
+- Component-based architecture that's easy to understand
+- Better separation of concerns to avoid common pitfalls
+
+### Not Perfect — But Perfect for Beginners
+
+**SuperbulletFrameworkV1-Knit** is intentionally designed as **the perfect framework for beginners**, not the "perfect" framework overall.
+
+We made specific trade-offs:
+
+- ✅ **Clarity over elegance** — verbose but understandable
+- ✅ **Error messages that teach** — not just report
+- ✅ **Familiar patterns** — OOP that feels natural
+- ✅ **Backward compatibility** — works with existing Knit knowledge
+
+### What About Advanced Developers?
+
+If you need the cleanest, most performant, industry-standard architecture, stay tuned for:
+
+🚀 **SuperbulletFrameworkV1-ECS** — Our upcoming framework built on [JECS](https://github.com/Jeijo/JECS)
+
+ECS (Entity Component System) is the **industry standard** for game architecture. It's what we'll recommend for production games and experienced teams.
+
+But for **learning, prototyping, and small-to-medium projects**, this Knit-based framework gets you building fast without the learning curve of ECS.
+
+---
+
 ## Architecture Notes
 
 - Most subsystems live in their own folders/modules and **only** use Knit to expose public methods.
