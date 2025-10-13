@@ -246,7 +246,7 @@ local TemplateService = require(Knit.GetService("TemplateService").Instance)
 ## 📦 License
 
 Base framework is built over **[Knit (MIT)](https://github.com/Sleitnick/Knit/blob/main/LICENSE)**.
-SuperbulletV1-Knit extensions are MIT as well.
+SuperbulletV1-Knit extensions are MIT-like as well, it's built literally for SuperbulletAI.
 
 ---
 
