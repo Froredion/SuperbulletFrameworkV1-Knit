@@ -137,13 +137,13 @@ local function DoesControllerExist(controllerName: string): boolean
 end
 
 local function InitializeComponents(serviceOrController, instance: Instance)
-	local componentsFolder = instance:FindFirstChild("Components")
+	local componentsFolder = instance:WaitForChild("Components", 1)
 	if not componentsFolder then
 		return
 	end
-	
+
 	-- Set up Components table and utility functions if they exist
-	local othersFolder = componentsFolder:FindFirstChild("Others")
+	local othersFolder = componentsFolder:WaitForChild("Others", 1)
 	if othersFolder then
 		serviceOrController.Components = {}
 		for _, v in pairs(othersFolder:GetChildren()) do
@@ -152,18 +152,18 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 			end
 		end
 	end
-	
+
 	-- Set up GetComponent and SetComponent utilities
-	local getComponent = componentsFolder:FindFirstChild("Get()")
+	local getComponent = componentsFolder:WaitForChild("Get()", 1)
 	if getComponent and getComponent:IsA("ModuleScript") then
 		serviceOrController.GetComponent = require(getComponent)
 	end
-	
-	local setComponent = componentsFolder:FindFirstChild("Set()")
+
+	local setComponent = componentsFolder:WaitForChild("Set()", 1)
 	if setComponent and setComponent:IsA("ModuleScript") then
 		serviceOrController.SetComponent = require(setComponent)
 	end
-	
+
 	-- Initialize all component modules
 	for _, v in pairs(componentsFolder:GetDescendants()) do
 		if v:IsA("ModuleScript") then
@@ -173,19 +173,19 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 				if v:GetAttribute("Initialized") then
 					continue
 				end
-				
+
 				if module.Init and typeof(module.Init) == "function" then
 					v:SetAttribute("Initialized", true)
-					
+
 					local initSuccess, err = pcall(function()
 						module.Init()
 					end)
-					
+
 					if not initSuccess then
 						warn(`Error initializing component {v:GetFullName()}: {err}`)
 					end
 				end
-				
+
 				if module.Start and typeof(module.Start) == "function" then
 					-- Check if already started (backwards compatibility)
 					if not v:GetAttribute("Started") then
@@ -194,7 +194,7 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 							local startSuccess, err = pcall(function()
 								module.Start()
 							end)
-							
+
 							if not startSuccess then
 								warn(`Error starting component {v:GetFullName()}: {err}`)
 							end
@@ -282,13 +282,13 @@ function KnitClient.CreateController(controllerDef: ControllerDef): Controller
 	assert(not started, `Controllers cannot be created after calling "Knit.Start()"`)
 
 	local controller = controllerDef :: Controller
-	
+
 	-- Initialize components if Instance is provided
 	if controllerDef.Instance then
 		InitializeComponents(controller, controllerDef.Instance)
-		controller.Instance = nil  -- Clean up, no longer needed
+		controller.Instance = nil -- Clean up, no longer needed
 	end
-	
+
 	controllers[controller.Name] = controller
 
 	return controller
