@@ -125,7 +125,7 @@ We made specific trade-offs:
 
 If you need the cleanest, most performant, industry-standard architecture, stay tuned for:
 
-🚀 **SuperbulletFrameworkV1-ECS** — Our upcoming framework built on [JECS](https://github.com/Jeijo/JECS)
+🚀 **SuperbulletFrameworkV1-ECS** — Our upcoming framework built on [JECS](https://github.com/Ukendio/jecs)
 
 ECS (Entity Component System) is the **industry standard** for game architecture. It's what we'll recommend for production games and experienced teams.
 
@@ -237,7 +237,7 @@ local TemplateService = require(Knit.GetService("TemplateService").Instance)
 
 ### 🚀 Future Plans
 
-- 🔄 Full ECS-based rewrite: `SuperbulletFrameworkV1-ECS` built on [JECS](https://github.com/Jeijo/JECS)
+- 🔄 Full ECS-based rewrite: `SuperbulletFrameworkV1-ECS` built on [JECS](hhttps://github.com/Ukendio/jecs)
 - 🔍 Service name autocomplete in `Knit.GetService()`
 - 📦 More template utilities and helpers
 
