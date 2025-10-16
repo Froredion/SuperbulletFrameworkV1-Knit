@@ -283,12 +283,6 @@ function KnitClient.CreateController(controllerDef: ControllerDef): Controller
 
 	local controller = controllerDef :: Controller
 
-	-- Initialize components if Instance is provided
-	if controllerDef.Instance then
-		InitializeComponents(controller, controllerDef.Instance)
-		controller.Instance = nil -- Clean up, no longer needed
-	end
-
 	controllers[controller.Name] = controller
 
 	return controller
@@ -491,6 +485,14 @@ function KnitClient.Start(options: KnitOptions?)
 
 		resolve(Promise.all(promisesStartControllers))
 	end):andThen(function()
+		-- Initialize Components (after KnitInit completes):
+		for _, controller in controllers do
+			if controller.Instance then
+				InitializeComponents(controller, controller.Instance)
+				controller.Instance = nil -- Clean up, no longer needed
+			end
+		end
+
 		-- Start:
 		for _, controller in controllers do
 			if type(controller.KnitStart) == "function" then

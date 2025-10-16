@@ -283,11 +283,6 @@ function KnitServer.CreateService(serviceDef: ServiceDef): Service
 		end
 	end
 
-	-- Initialize components if Instance is provided
-	if serviceDef.Instance then
-		InitializeComponents(service, serviceDef.Instance)
-	end
-
 	services[service.Name] = service
 
 	return service
@@ -554,6 +549,14 @@ function KnitServer.Start(options: KnitOptions?)
 
 		resolve(Promise.all(promisesInitServices))
 	end):andThen(function()
+		-- Initialize Components (after KnitInit completes):
+		for _, service in services do
+			if service.Instance then
+				InitializeComponents(service, service.Instance)
+				service.Instance = nil -- Clean up, no longer needed
+			end
+		end
+
 		-- Start:
 		for _, service in services do
 			if type(service.KnitStart) == "function" then
