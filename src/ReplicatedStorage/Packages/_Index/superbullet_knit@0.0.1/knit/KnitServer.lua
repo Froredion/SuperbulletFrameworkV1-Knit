@@ -186,7 +186,7 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 		serviceOrController.SetComponent = require(setComponent)
 	end
 
-	-- Initialize all component modules
+	-- Initialize all component modules (Init only, Start will be called later)
 	for _, v in pairs(componentsFolder:GetDescendants()) do
 		if v:IsA("ModuleScript") then
 			local success, module = pcall(require, v)
@@ -207,7 +207,22 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 						warn(`Error initializing component {v:GetFullName()}: {err}`)
 					end
 				end
+			end
+		end
+	end
+end
 
+local function StartComponents(serviceOrController, instance: Instance)
+	local componentsFolder = instance:WaitForChild("Components", 1)
+	if not componentsFolder then
+		return
+	end
+
+	-- Start all component modules
+	for _, v in pairs(componentsFolder:GetDescendants()) do
+		if v:IsA("ModuleScript") then
+			local success, module = pcall(require, v)
+			if success and typeof(module) == "table" then
 				if module.Start and typeof(module.Start) == "function" then
 					-- Check if already started (backwards compatibility)
 					if not v:GetAttribute("Started") then
@@ -550,9 +565,11 @@ function KnitServer.Start(options: KnitOptions?)
 		resolve(Promise.all(promisesInitServices))
 	end):andThen(function()
 		-- Initialize Components (after KnitInit completes):
+		local servicesWithComponents = {}
 		for _, service in services do
 			if service.Instance then
 				InitializeComponents(service, service.Instance)
+				table.insert(servicesWithComponents, { service = service, instance = service.Instance })
 				service.Instance = nil -- Clean up, no longer needed
 			end
 		end
@@ -566,6 +583,13 @@ function KnitServer.Start(options: KnitOptions?)
 				end)
 			end
 		end
+
+		-- Start Components (after all services have started):
+		task.defer(function()
+			for _, data in servicesWithComponents do
+				StartComponents(data.service, data.instance)
+			end
+		end)
 
 		startedComplete = true
 		onStartedComplete:Fire()

@@ -164,7 +164,7 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 		serviceOrController.SetComponent = require(setComponent)
 	end
 
-	-- Initialize all component modules
+	-- Initialize all component modules (Init only, Start will be called later)
 	for _, v in pairs(componentsFolder:GetDescendants()) do
 		if v:IsA("ModuleScript") then
 			local success, module = pcall(require, v)
@@ -185,7 +185,22 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 						warn(`Error initializing component {v:GetFullName()}: {err}`)
 					end
 				end
+			end
+		end
+	end
+end
 
+local function StartComponents(serviceOrController, instance: Instance)
+	local componentsFolder = instance:WaitForChild("Components", 1)
+	if not componentsFolder then
+		return
+	end
+
+	-- Start all component modules
+	for _, v in pairs(componentsFolder:GetDescendants()) do
+		if v:IsA("ModuleScript") then
+			local success, module = pcall(require, v)
+			if success and typeof(module) == "table" then
 				if module.Start and typeof(module.Start) == "function" then
 					-- Check if already started (backwards compatibility)
 					if not v:GetAttribute("Started") then
@@ -486,9 +501,11 @@ function KnitClient.Start(options: KnitOptions?)
 		resolve(Promise.all(promisesStartControllers))
 	end):andThen(function()
 		-- Initialize Components (after KnitInit completes):
+		local controllersWithComponents = {}
 		for _, controller in controllers do
 			if controller.Instance then
 				InitializeComponents(controller, controller.Instance)
+				table.insert(controllersWithComponents, { controller = controller, instance = controller.Instance })
 				controller.Instance = nil -- Clean up, no longer needed
 			end
 		end
@@ -502,6 +519,13 @@ function KnitClient.Start(options: KnitOptions?)
 				end)
 			end
 		end
+
+		-- Start Components (after all controllers have started):
+		task.defer(function()
+			for _, data in controllersWithComponents do
+				StartComponents(data.controller, data.instance)
+			end
+		end)
 
 		startedComplete = true
 		onStartedComplete:Fire()
