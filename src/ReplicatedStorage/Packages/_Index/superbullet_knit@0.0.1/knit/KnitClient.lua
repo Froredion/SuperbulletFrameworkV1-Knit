@@ -404,6 +404,35 @@ function KnitClient.GetService(serviceName: string): Service
 	assert(started, KnitErrorHelper.GetStartErrorMessage(started, "GetService", controllers, true)) -- true = client-side
 	assert(type(serviceName) == "string", `ServiceName must be a string; got {type(serviceName)}`)
 
+	-- Warn if GetService is called during initialization and takes too long
+	if not startedComplete then
+		task.spawn(function()
+			task.wait(5)
+			if not startedComplete then
+				warn(
+					string.format(
+						"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+							.. "⚠️  Knit Initialization Warning (Client)\n"
+							.. "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+							.. "GetService('%s') called during initialization, and Knit has been\n"
+							.. "initializing for more than 5 seconds.\n"
+							.. "\n"
+							.. "Possible causes:\n"
+							.. "• Service '%s' does not exist on the server\n"
+							.. "• Service has no Client table exposed\n"
+							.. "• Server has not finished initializing (check server console)\n"
+							.. "• A KnitInit or component Init() is yielding\n"
+							.. "\n"
+							.. "This is blocking Knit from completing initialization.\n"
+							.. "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+						serviceName,
+						serviceName
+					)
+				)
+			end
+		end)
+	end
+
 	return BuildService(serviceName)
 end
 
