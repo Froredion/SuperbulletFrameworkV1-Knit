@@ -142,7 +142,7 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 		return
 	end
 
-	-- Set up Components table and utility functions if they exist
+	-- Step 1: Set up Components table and utility functions
 	local othersFolder = componentsFolder:WaitForChild("Others", 1)
 	if othersFolder then
 		serviceOrController.Components = {}
@@ -164,7 +164,7 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 		serviceOrController.SetComponent = require(setComponent)
 	end
 
-	-- Initialize all component modules (Init only, Start will be called later)
+	-- Step 2: Initialize all component modules
 	for _, v in pairs(componentsFolder:GetDescendants()) do
 		if v:IsA("ModuleScript") then
 			local success, module = pcall(require, v)
@@ -176,7 +176,6 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 
 				if module.Init and typeof(module.Init) == "function" then
 					v:SetAttribute("Initialized", true)
-
 					local initSuccess, err = pcall(function()
 						module.Init()
 					end)
@@ -206,13 +205,7 @@ local function StartComponents(serviceOrController, instance: Instance)
 					if not v:GetAttribute("Started") then
 						v:SetAttribute("Started", true)
 						task.spawn(function()
-							local startSuccess, err = pcall(function()
-								module.Start()
-							end)
-
-							if not startSuccess then
-								warn(`Error starting component {v:GetFullName()}: {err}`)
-							end
+							module.Start()
 						end)
 					end
 				end
@@ -424,6 +417,9 @@ function KnitClient.GetService(serviceName: string): Service
 							.. "• A KnitInit or component Init() is yielding\n"
 							.. "\n"
 							.. "This is blocking Knit from completing initialization.\n"
+							.. "\n"
+							.. "💡 If none of these are the issue, scroll up in the console\n"
+							.. "   to find any other warnings or errors that might be the cause.\n"
 							.. "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
 						serviceName,
 						serviceName
@@ -529,7 +525,7 @@ function KnitClient.Start(options: KnitOptions?)
 
 		resolve(Promise.all(promisesStartControllers))
 	end):andThen(function()
-		-- Initialize Components (after KnitInit completes):
+		-- Initialize Components (setup and init before KnitStart):
 		local controllersWithComponents = {}
 		for _, controller in controllers do
 			if controller.Instance then
