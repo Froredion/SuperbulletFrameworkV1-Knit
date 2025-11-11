@@ -531,7 +531,7 @@ function KnitClient.Start(options: KnitOptions?)
 			if controller.Instance then
 				InitializeComponents(controller, controller.Instance)
 				table.insert(controllersWithComponents, { controller = controller, instance = controller.Instance })
-				controller.Instance = nil -- Clean up, no longer needed
+				-- controller.Instance = nil -- Keep Instance available for runtime access
 			end
 		end
 

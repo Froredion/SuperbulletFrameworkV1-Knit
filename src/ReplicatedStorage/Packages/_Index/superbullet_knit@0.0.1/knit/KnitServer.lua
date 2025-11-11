@@ -593,7 +593,7 @@ function KnitServer.Start(options: KnitOptions?)
 			if service.Instance then
 				InitializeComponents(service, service.Instance)
 				table.insert(servicesWithComponents, { service = service, instance = service.Instance })
-				service.Instance = nil -- Clean up, no longer needed
+				-- service.Instance = nil -- Keep Instance available for runtime access
 			end
 		end
 
