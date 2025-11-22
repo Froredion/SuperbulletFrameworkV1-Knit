@@ -235,11 +235,22 @@ local TemplateService = require(Knit.GetService("TemplateService").Instance)
 
 **SuperbulletFrameworkV1-Knit** isn't perfect or as clean as it could be yet. We're prioritizing **backward compatibility with vanilla Knit** to keep this framework accessible to everyone — whether you're migrating an existing project or starting fresh.
 
+### 🔤 Next Major Update: Method Naming Improvement
+
+**Get() and Set() → Accessor and Mutator**
+
+In the next update, we'll be renaming `Get()` and `Set()` to **`Accessor`** and **`Mutator`** to better explain what they do in a straightforward way.
+
+- `Get()` → `Accessor` — clearly indicates it's for accessing/reading data
+- `Set()` → `Mutator` — clearly indicates it's for mutating/modifying data
+
+**Backward compatibility will be maintained** so your existing code using `Get()` and `Set()` will continue to work. This change is all about improving clarity for new developers while keeping your current projects running smoothly.
+
 ### 🚀 Future Plans
 
-- 🔄 Full ECS-based rewrite: `SuperbulletFrameworkV1-ECS` built on [JECS](hhttps://github.com/Ukendio/jecs)
-- 🔍 Service name autocomplete in `Knit.GetService()`
-- 📦 More template utilities and helpers
+1. 🔄 Full ECS-based rewrite: `SuperbulletFrameworkV1-ECS` built on [JECS](hhttps://github.com/Ukendio/jecs)
+2. 🔍 Service name autocomplete in `Knit.GetService()`
+3. 📦 More template utilities and helpers
 
 ---
 
