@@ -146,7 +146,7 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 	local othersFolder = componentsFolder:WaitForChild("Others", 1)
 	if othersFolder then
 		serviceOrController.Components = {}
-		for _, v in pairs(othersFolder:GetChildren()) do
+		for _, v in pairs(othersFolder:GetDescendants()) do
 			if v:IsA("ModuleScript") then
 				serviceOrController.Components[v.Name] = require(v)
 			end
