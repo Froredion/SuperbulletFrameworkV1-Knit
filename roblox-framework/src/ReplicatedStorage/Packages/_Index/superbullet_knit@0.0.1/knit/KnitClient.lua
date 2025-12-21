@@ -153,15 +153,24 @@ local function InitializeComponents(serviceOrController, instance: Instance)
 		end
 	end
 
-	-- Set up GetComponent and SetComponent utilities
-	local getComponent = componentsFolder:WaitForChild("Get()", 1)
-	if getComponent and getComponent:IsA("ModuleScript") then
-		serviceOrController.GetComponent = require(getComponent)
+	-- Set up Accessor (new) with Get() fallback for backward compatibility
+	local accessorComponent = componentsFolder:FindFirstChild("Accessor")
+	if not accessorComponent then
+		accessorComponent = componentsFolder:WaitForChild("Get()", 1)
+	end
+	if accessorComponent and accessorComponent:IsA("ModuleScript") then
+		serviceOrController.Accessor = require(accessorComponent)
+		serviceOrController.GetComponent = serviceOrController.Accessor -- Backward compatibility alias
 	end
 
-	local setComponent = componentsFolder:WaitForChild("Set()", 1)
-	if setComponent and setComponent:IsA("ModuleScript") then
-		serviceOrController.SetComponent = require(setComponent)
+	-- Set up Mutator (new) with Set() fallback for backward compatibility
+	local mutatorComponent = componentsFolder:FindFirstChild("Mutator")
+	if not mutatorComponent then
+		mutatorComponent = componentsFolder:WaitForChild("Set()", 1)
+	end
+	if mutatorComponent and mutatorComponent:IsA("ModuleScript") then
+		serviceOrController.Mutator = require(mutatorComponent)
+		serviceOrController.SetComponent = serviceOrController.Mutator -- Backward compatibility alias
 	end
 
 	-- Step 2: Initialize all component modules
