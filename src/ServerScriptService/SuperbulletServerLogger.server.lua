@@ -18,9 +18,14 @@ local BATCH_INTERVAL = 1 -- seconds
 local MAX_BATCH_SIZE = 100
 local MAX_BUFFER_SIZE = MAX_BATCH_SIZE * 2
 
--- Read configuration from ServerStorage.Superbullet_Server
+-- Read configuration from ServerStorage.Superbullet.Superbullet_Server
 local function getConfig()
-	local configFolder = ServerStorage:FindFirstChild("Superbullet_Server")
+	local superbulletFolder = ServerStorage:FindFirstChild("Superbullet")
+	if not superbulletFolder then
+		return { mode = "localhost", port = 13528 }
+	end
+
+	local configFolder = superbulletFolder:FindFirstChild("Superbullet_Server")
 	if not configFolder then
 		return { mode = "localhost", port = 13528 }
 	end
