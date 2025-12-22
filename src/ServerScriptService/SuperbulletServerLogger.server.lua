@@ -37,7 +37,7 @@ local function getConfig()
 	return {
 		mode = modeValue and modeValue.Value or "localhost",
 		port = portValue and portValue.Value or 13528,
-		cloudToken = tokenValue and tokenValue.Value or nil
+		cloudToken = tokenValue and tokenValue.Value or nil,
 	}
 end
 
@@ -105,11 +105,9 @@ local config = getConfig()
 -- NOTE: Cloud mode implementation is in Phase 5
 local function getEndpointUrl(endpoint)
 	if config.mode == "cloud" and config.cloudToken then
-		-- Cloud mode (Phase 5): send to backend
 		local baseUrl = "https://superbullet-backend-3948693.superbulletstudios.com"
-		return baseUrl .. "/api/superbullet" .. endpoint
+		return baseUrl .. "/api/superbullet" .. endpoint .. "?token=" .. config.cloudToken
 	else
-		-- Localhost mode (Phases 1-4)
 		return string.format("http://localhost:%d%s", config.port, endpoint)
 	end
 end
@@ -121,13 +119,15 @@ end
 
 -- Send logs to frontend
 local function sendLogs(logs)
-	if #logs == 0 then return end
+	if #logs == 0 then
+		return
+	end
 
 	local url = getEndpointUrl("/playtest/logs")
 	local body = HttpService:JSONEncode({
 		token = config.mode == "cloud" and config.cloudToken or nil,
 		timestamp = getTimestampMs(),
-		logs = logs
+		logs = logs,
 	})
 
 	local success, result = pcall(function()
@@ -144,7 +144,7 @@ local function notifyPlaytestStart()
 	local url = getEndpointUrl("/playtest/start")
 	local body = HttpService:JSONEncode({
 		token = config.mode == "cloud" and config.cloudToken or nil,
-		timestamp = getTimestampMs()
+		timestamp = getTimestampMs(),
 	})
 
 	pcall(function()
@@ -167,7 +167,7 @@ local function parseLogMessage(message)
 		return {
 			script = scriptName,
 			line = tonumber(line),
-			message = msg
+			message = msg,
 		}
 	end
 
@@ -192,7 +192,7 @@ local function addLog(source, level, message, traceback)
 		message = parsed.message or message,
 		script = parsed.script,
 		line = parsed.line,
-		traceback = traceback
+		traceback = traceback,
 	})
 
 	-- Prevent buffer overflow - trim efficiently by creating new table
@@ -229,9 +229,15 @@ end)
 -- Listen for client logs via RemoteEvent
 clientLogEvent.OnServerEvent:Connect(function(player, logData)
 	-- Validate logData
-	if type(logData) ~= "table" then return end
-	if type(logData.level) ~= "string" then return end
-	if type(logData.message) ~= "string" then return end
+	if type(logData) ~= "table" then
+		return
+	end
+	if type(logData.level) ~= "string" then
+		return
+	end
+	if type(logData.message) ~= "string" then
+		return
+	end
 
 	-- Sanitize and add player info
 	local sanitizedMessage = logData.message:sub(1, 1000) -- Limit message length
@@ -291,7 +297,7 @@ game:BindToClose(function()
 	local url = getEndpointUrl("/playtest/stop")
 	local body = HttpService:JSONEncode({
 		token = config.mode == "cloud" and config.cloudToken or nil,
-		timestamp = getTimestampMs()
+		timestamp = getTimestampMs(),
 	})
 
 	pcall(function()
