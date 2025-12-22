@@ -235,16 +235,16 @@ local TemplateService = require(Knit.GetService("TemplateService").Instance)
 
 **SuperbulletFrameworkV1-Knit** isn't perfect or as clean as it could be yet. We're prioritizing **backward compatibility with vanilla Knit** to keep this framework accessible to everyone — whether you're migrating an existing project or starting fresh.
 
-### 🔤 Next Major Update: Method Naming Improvement
+### 🔤 Recent Update: Method Naming Improvement
 
 **Get() and Set() → Accessor and Mutator**
 
-In the next update, we'll be renaming `Get()` and `Set()` to **`Accessor`** and **`Mutator`** to better explain what they do in a straightforward way.
+We've renamed the component utilities from `Get()` and `Set()` to **`Accessor`** and **`Mutator`** for improved clarity.
 
-- `Get()` → `Accessor` — clearly indicates it's for accessing/reading data
-- `Set()` → `Mutator` — clearly indicates it's for mutating/modifying data
+- `Accessor` — for reading/fetching data without modifying state
+- `Mutator` — for modifying/updating data and changing state
 
-**Backward compatibility will be maintained** so your existing code using `Get()` and `Set()` will continue to work. This change is all about improving clarity for new developers while keeping your current projects running smoothly.
+**Backward compatibility is maintained** — your existing code using `GetComponent` and `SetComponent` continues to work. Both old `Get().lua`/`Set().lua` files and new `Accessor.lua`/`Mutator.lua` files are supported.
 
 ### 🚀 Future Plans
 
