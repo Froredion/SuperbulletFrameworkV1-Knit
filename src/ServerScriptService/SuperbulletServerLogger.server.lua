@@ -41,6 +41,57 @@ local clientLogEvent = Instance.new("RemoteEvent")
 clientLogEvent.Name = "SuperbulletClientLog"
 clientLogEvent.Parent = ReplicatedStorage
 
+-- Create RemoteEvent to notify client if HttpService is disabled
+local httpDisabledEvent = Instance.new("RemoteEvent")
+httpDisabledEvent.Name = "SuperbulletHttpDisabled"
+httpDisabledEvent.Parent = ReplicatedStorage
+
+-- Check if HttpService is enabled
+local function isHttpServiceEnabled()
+	local success, result = pcall(function()
+		-- Try a simple request to check if HttpService is enabled
+		-- This will error immediately if HttpService is disabled (before any network call)
+		HttpService:GetAsync("http://localhost:1")
+	end)
+
+	if not success then
+		-- Check if the error is specifically about HttpService being disabled
+		local errorMsg = tostring(result):lower()
+		if errorMsg:find("http requests are not enabled") or errorMsg:find("httpservice is not enabled") then
+			return false
+		end
+	end
+
+	-- If we got here, HttpService is enabled (even if the request failed for other reasons)
+	return true
+end
+
+local httpEnabled = isHttpServiceEnabled()
+
+-- Notify players when they join if HttpService is disabled
+if not httpEnabled then
+	warn("[SuperbulletLogger] HttpService is disabled! Superbullet AI debugger requires HttpService to be enabled.")
+
+	game:GetService("Players").PlayerAdded:Connect(function(player)
+		-- Small delay to ensure client is ready
+		task.delay(1, function()
+			httpDisabledEvent:FireClient(player)
+		end)
+	end)
+
+	-- Also notify any players already in the game
+	for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+		task.delay(1, function()
+			httpDisabledEvent:FireClient(player)
+		end)
+	end
+end
+
+-- If HttpService is disabled, don't proceed with logging (client will show UI)
+if not httpEnabled then
+	return
+end
+
 -- Log buffer
 local logBuffer = {}
 local config = getConfig()
