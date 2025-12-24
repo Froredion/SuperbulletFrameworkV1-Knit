@@ -121,6 +121,8 @@ local Promise = require(KnitClient.Util.Promise)
 local Comm = require(KnitClient.Util.Comm)
 local ClientComm = Comm.ClientComm
 local KnitErrorHelper = require(script.Parent.KnitErrorHelper)
+local Components = require(script.Parent.Components)
+local ComponentInitializer = Components.ComponentInitializer
 
 local controllers: { [string]: Controller } = {}
 local services: { [string]: Service } = {}
@@ -134,93 +136,6 @@ local function DoesControllerExist(controllerName: string): boolean
 	local controller: Controller? = controllers[controllerName]
 
 	return controller ~= nil
-end
-
-local function InitializeComponents(serviceOrController, instance: Instance)
-	local componentsFolder = instance:WaitForChild("Components", 1)
-	if not componentsFolder then
-		return
-	end
-
-	-- Step 1: Set up Components table and utility functions
-	local othersFolder = componentsFolder:WaitForChild("Others", 1)
-	if othersFolder then
-		serviceOrController.Components = {}
-		for _, v in pairs(othersFolder:GetDescendants()) do
-			if v:IsA("ModuleScript") then
-				serviceOrController.Components[v.Name] = require(v)
-			end
-		end
-	end
-
-	-- Set up Accessor (new) with Get() fallback for backward compatibility
-	local accessorComponent = componentsFolder:FindFirstChild("Accessor")
-	if not accessorComponent then
-		accessorComponent = componentsFolder:WaitForChild("Get()", 1)
-	end
-	if accessorComponent and accessorComponent:IsA("ModuleScript") then
-		serviceOrController.Accessor = require(accessorComponent)
-		serviceOrController.GetComponent = serviceOrController.Accessor -- Backward compatibility alias
-	end
-
-	-- Set up Mutator (new) with Set() fallback for backward compatibility
-	local mutatorComponent = componentsFolder:FindFirstChild("Mutator")
-	if not mutatorComponent then
-		mutatorComponent = componentsFolder:WaitForChild("Set()", 1)
-	end
-	if mutatorComponent and mutatorComponent:IsA("ModuleScript") then
-		serviceOrController.Mutator = require(mutatorComponent)
-		serviceOrController.SetComponent = serviceOrController.Mutator -- Backward compatibility alias
-	end
-
-	-- Step 2: Initialize all component modules
-	for _, v in pairs(componentsFolder:GetDescendants()) do
-		if v:IsA("ModuleScript") then
-			local success, module = pcall(require, v)
-			if success and typeof(module) == "table" then
-				-- Check if already initialized (backwards compatibility)
-				if v:GetAttribute("Initialized") then
-					continue
-				end
-
-				if module.Init and typeof(module.Init) == "function" then
-					v:SetAttribute("Initialized", true)
-					local initSuccess, err = pcall(function()
-						module.Init()
-					end)
-
-					if not initSuccess then
-						warn(`Error initializing component {v:GetFullName()}: {err}`)
-					end
-				end
-			end
-		end
-	end
-end
-
-local function StartComponents(serviceOrController, instance: Instance)
-	local componentsFolder = instance:WaitForChild("Components", 1)
-	if not componentsFolder then
-		return
-	end
-
-	-- Start all component modules
-	for _, v in pairs(componentsFolder:GetDescendants()) do
-		if v:IsA("ModuleScript") then
-			local success, module = pcall(require, v)
-			if success and typeof(module) == "table" then
-				if module.Start and typeof(module.Start) == "function" then
-					-- Check if already started (backwards compatibility)
-					if not v:GetAttribute("Started") then
-						v:SetAttribute("Started", true)
-						task.spawn(function()
-							module.Start()
-						end)
-					end
-				end
-			end
-		end
-	end
 end
 
 local function GetServicesFolder()
@@ -238,6 +153,12 @@ local function GetServicesFolder()
 					.. "    Check the server console for KnitInit errors above.\n"
 					.. "━━━━━━━━━━━━━━━━━━━━"
 			)
+		end
+		
+		-- Wait for server to signal all remotes (including dynamic ones) are ready
+		-- Use a loop to handle race conditions where attribute might be set between check and wait
+		while not servicesFolder:GetAttribute("Ready") do
+			servicesFolder:GetAttributeChangedSignal("Ready"):Wait()
 		end
 	end
 
@@ -538,7 +459,7 @@ function KnitClient.Start(options: KnitOptions?)
 		local controllersWithComponents = {}
 		for _, controller in controllers do
 			if controller.Instance then
-				InitializeComponents(controller, controller.Instance)
+				ComponentInitializer.Initialize(controller, controller.Instance)
 				table.insert(controllersWithComponents, { controller = controller, instance = controller.Instance })
 				-- controller.Instance = nil -- Keep Instance available for runtime access
 			end
@@ -557,7 +478,7 @@ function KnitClient.Start(options: KnitOptions?)
 		-- Start Components (after all controllers have started):
 		task.defer(function()
 			for _, data in controllersWithComponents do
-				StartComponents(data.controller, data.instance)
+				ComponentInitializer.Start(data.controller, data.instance)
 			end
 		end)
 

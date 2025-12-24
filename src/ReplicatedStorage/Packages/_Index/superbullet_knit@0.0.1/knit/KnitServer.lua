@@ -146,10 +146,14 @@ local Promise = require(KnitServer.Util.Promise)
 local Comm = require(KnitServer.Util.Comm)
 local ServerComm = Comm.ServerComm
 local KnitErrorHelper = require(script.Parent.KnitErrorHelper)
+local Components = require(script.Parent.Components)
+local ClientExtension = Components.ClientExtension
+local ComponentInitializer = Components.ComponentInitializer
 
 local services: { [string]: Service } = {}
 local started = false
 local startedComplete = false
+local clientExtensionLocked = false -- Separate flag for ClientExtension timing
 local onStartedComplete = Instance.new("BindableEvent")
 
 local function DoesServiceExist(serviceName: string): boolean
@@ -158,92 +162,6 @@ local function DoesServiceExist(serviceName: string): boolean
 	return service ~= nil
 end
 
-local function InitializeComponents(serviceOrController, instance: Instance)
-	local componentsFolder = instance:WaitForChild("Components", 1)
-	if not componentsFolder then
-		return
-	end
-
-	-- Step 1: Set up Components table and utility functions
-	local othersFolder = componentsFolder:WaitForChild("Others", 1)
-	if othersFolder then
-		serviceOrController.Components = {}
-		for _, v in pairs(othersFolder:GetDescendants()) do
-			if v:IsA("ModuleScript") then
-				serviceOrController.Components[v.Name] = require(v)
-			end
-		end
-	end
-
-	-- Set up Accessor (new) with Get() fallback for backward compatibility
-	local accessorComponent = componentsFolder:FindFirstChild("Accessor")
-	if not accessorComponent then
-		accessorComponent = componentsFolder:WaitForChild("Get()", 1)
-	end
-	if accessorComponent and accessorComponent:IsA("ModuleScript") then
-		serviceOrController.Accessor = require(accessorComponent)
-		serviceOrController.GetComponent = serviceOrController.Accessor -- Backward compatibility alias
-	end
-
-	-- Set up Mutator (new) with Set() fallback for backward compatibility
-	local mutatorComponent = componentsFolder:FindFirstChild("Mutator")
-	if not mutatorComponent then
-		mutatorComponent = componentsFolder:WaitForChild("Set()", 1)
-	end
-	if mutatorComponent and mutatorComponent:IsA("ModuleScript") then
-		serviceOrController.Mutator = require(mutatorComponent)
-		serviceOrController.SetComponent = serviceOrController.Mutator -- Backward compatibility alias
-	end
-
-	-- Step 2: Initialize all component modules
-	for _, v in pairs(componentsFolder:GetDescendants()) do
-		if v:IsA("ModuleScript") then
-			local success, module = pcall(require, v)
-			if success and typeof(module) == "table" then
-				-- Check if already initialized (backwards compatibility)
-				if v:GetAttribute("Initialized") then
-					continue
-				end
-
-				if module.Init and typeof(module.Init) == "function" then
-					v:SetAttribute("Initialized", true)
-					local initSuccess, err = pcall(function()
-						module.Init()
-					end)
-
-					if not initSuccess then
-						warn(`Error initializing component {v:GetFullName()}: {err}`)
-					end
-				end
-			end
-		end
-	end
-end
-
-local function StartComponents(serviceOrController, instance: Instance)
-	local componentsFolder = instance:WaitForChild("Components", 1)
-	if not componentsFolder then
-		return
-	end
-
-	-- Start all component modules
-	for _, v in pairs(componentsFolder:GetDescendants()) do
-		if v:IsA("ModuleScript") then
-			local success, module = pcall(require, v)
-			if success and typeof(module) == "table" then
-				if module.Start and typeof(module.Start) == "function" then
-					-- Check if already started (backwards compatibility)
-					if not v:GetAttribute("Started") then
-						v:SetAttribute("Started", true)
-						task.spawn(function()
-							module.Start()
-						end)
-					end
-				end
-			end
-		end
-	end
-end
 
 --[=[
 	Constructs a new service.
@@ -479,6 +397,79 @@ function KnitServer.CreateProperty(initialValue: any)
 end
 
 --[=[
+	@function RegisterClientSignal
+	@within KnitServer
+
+	Registers a new signal on the service's Client table from a submodule.
+	Must be called BEFORE Knit.Start().
+
+	Returns the RemoteSignal immediately so you can chain :Connect().
+
+	```lua
+	-- In a submodule's Init():
+	Knit.RegisterClientSignal(QuestService, "OnQuestComplete"):Connect(function(player, questId)
+		print(player, "completed quest", questId)
+	end)
+	```
+
+	@param service Service -- The service to register on
+	@param signalName string -- The name of the signal
+	@param unreliable boolean? -- Use UnreliableRemoteEvent (default: false)
+	@return RemoteSignal
+]=]
+function KnitServer.RegisterClientSignal(service: Service, signalName: string, unreliable: boolean?)
+	return ClientExtension.RegisterClientSignal(service, signalName, unreliable, clientExtensionLocked)
+end
+
+--[=[
+	@function RegisterClientMethod
+	@within KnitServer
+
+	Registers a new method on the service's Client table from a submodule.
+	Must be called BEFORE Knit.Start().
+
+	Returns a wrapper with .OnServerInvoke property (Roblox-style).
+
+	```lua
+	-- In a submodule's Init():
+	Knit.RegisterClientMethod(QuestService, "GetActiveQuests").OnServerInvoke = function(self, player)
+		return QuestManager:GetPlayerQuests(player)
+	end
+	```
+
+	@param service Service -- The service to register on
+	@param methodName string -- The name of the method
+	@return MethodWrapper
+]=]
+function KnitServer.RegisterClientMethod(service: Service, methodName: string)
+	return ClientExtension.RegisterClientMethod(service, methodName, clientExtensionLocked)
+end
+
+--[=[
+	@function RegisterClientProperty
+	@within KnitServer
+
+	Registers a new property on the service's Client table from a submodule.
+	Must be called BEFORE Knit.Start().
+
+	Returns the RemoteProperty immediately.
+
+	```lua
+	-- In a submodule's Init():
+	local prop = Knit.RegisterClientProperty(QuestService, "QuestConfig", { MaxActive = 5 })
+	prop:Set({ MaxActive = 10 })
+	```
+
+	@param service Service -- The service to register on
+	@param propertyName string -- The name of the property
+	@param initialValue any -- The initial value
+	@return RemoteProperty
+]=]
+function KnitServer.RegisterClientProperty(service: Service, propertyName: string, initialValue: any)
+	return ClientExtension.RegisterClientProperty(service, propertyName, initialValue, clientExtensionLocked)
+end
+
+--[=[
 	@return Promise
 	Starts Knit. Should only be called once.
 
@@ -553,6 +544,10 @@ function KnitServer.Start(options: KnitOptions?)
 					service.Client[k] = service.KnitComm:CreateSignal(k, true, inbound, outbound)
 				elseif type(v) == "table" and v[1] == PROPERTY_MARKER then
 					service.Client[k] = service.KnitComm:CreateProperty(k, v[2], inbound, outbound)
+				elseif type(v) == "table" then
+					-- Skip already-created RemoteSignals/RemoteProperties from RegisterClient*
+					-- These have internal fields like _re (RemoteEvent) or similar
+					continue
 				end
 			end
 		end
@@ -600,11 +595,15 @@ function KnitServer.Start(options: KnitOptions?)
 		local servicesWithComponents = {}
 		for _, service in services do
 			if service.Instance then
-				InitializeComponents(service, service.Instance)
+				ComponentInitializer.Initialize(service, service.Instance)
 				table.insert(servicesWithComponents, { service = service, instance = service.Instance })
 				-- service.Instance = nil -- Keep Instance available for runtime access
 			end
 		end
+
+		-- Lock ClientExtension before KnitStart phase begins
+		-- After this point, no new signals/methods/properties can be registered
+		clientExtensionLocked = true
 
 		-- Start:
 		for _, service in services do
@@ -619,9 +618,16 @@ function KnitServer.Start(options: KnitOptions?)
 		-- Start Components (after all services have started):
 		task.defer(function()
 			for _, data in servicesWithComponents do
-				StartComponents(data.service, data.instance)
+				ComponentInitializer.Start(data.service, data.instance)
 			end
 		end)
+
+		-- Expose service remotes to everyone FIRST (before signaling ready)
+		knitRepServiceFolder.Parent = script.Parent
+		
+		-- Set ready attribute so clients know all remotes are registered
+		-- This happens AFTER component.Init() has registered all dynamic items
+		knitRepServiceFolder:SetAttribute("Ready", true)
 
 		startedComplete = true
 		onStartedComplete:Fire()
@@ -629,9 +635,6 @@ function KnitServer.Start(options: KnitOptions?)
 		task.defer(function()
 			onStartedComplete:Destroy()
 		end)
-
-		-- Expose service remotes to everyone:
-		knitRepServiceFolder.Parent = script.Parent
 	end)
 end
 
