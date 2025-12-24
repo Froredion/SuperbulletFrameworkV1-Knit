@@ -44,7 +44,13 @@ function MethodWrapper:__newindex(key: string, value: any)
 		assert(not self._assigned, `OnServerInvoke for "{self._methodName}" has already been assigned`)
 		assert(type(value) == "function", "OnServerInvoke must be a function")
 
+		-- Set the function on Client table
 		self._service.Client[self._methodName] = value
+		
+		-- CRITICAL: Wrap the method to create the actual RemoteFunction
+		-- This is what makes the method callable from clients
+		self._service.KnitComm:WrapMethod(self._service.Client, self._methodName)
+		
 		rawset(self, "_assigned", true)
 		rawset(self, "_onServerInvoke", value)
 	else
@@ -57,9 +63,9 @@ local function validateRegistration(
 	service: Service,
 	itemName: string,
 	itemType: string,
-	started: boolean
+	locked: boolean
 )
-	assert(not started, `Cannot register client {itemType} after Knit.Start()`)
+	assert(not locked, `Cannot register client {itemType} after component Init phase (before KnitStart)`)
 	assert(type(itemName) == "string" and #itemName > 0, `{itemType} name must be a non-empty string`)
 	assert(
 		type(service) == "table" and service.Name and service.Client,
@@ -96,16 +102,16 @@ end
 	@param service Service -- The service to register on
 	@param signalName string -- The name of the signal
 	@param unreliable boolean? -- Use UnreliableRemoteEvent (default: false)
-	@param started boolean -- Internal: whether Knit has started
+	@param locked boolean -- Internal: whether ClientExtension registration is locked
 	@return RemoteSignal
 ]=]
 function ClientExtension.RegisterClientSignal(
 	service: Service,
 	signalName: string,
 	unreliable: boolean?,
-	started: boolean
+	locked: boolean
 )
-	validateRegistration(service, signalName, "Signal", started)
+	validateRegistration(service, signalName, "Signal", locked)
 
 	local signal = service.KnitComm:CreateSignal(signalName, unreliable or false)
 	service.Client[signalName] = signal
@@ -127,15 +133,15 @@ end
 
 	@param service Service -- The service to register on
 	@param methodName string -- The name of the method
-	@param started boolean -- Internal: whether Knit has started
+	@param locked boolean -- Internal: whether ClientExtension registration is locked
 	@return MethodWrapper
 ]=]
 function ClientExtension.RegisterClientMethod(
 	service: Service,
 	methodName: string,
-	started: boolean
+	locked: boolean
 )
-	validateRegistration(service, methodName, "Method", started)
+	validateRegistration(service, methodName, "Method", locked)
 
 	return MethodWrapper.new(service, methodName)
 end
@@ -159,16 +165,16 @@ end
 	@param service Service -- The service to register on
 	@param propertyName string -- The name of the property
 	@param initialValue any -- The initial value
-	@param started boolean -- Internal: whether Knit has started
+	@param locked boolean -- Internal: whether ClientExtension registration is locked
 	@return RemoteProperty
 ]=]
 function ClientExtension.RegisterClientProperty(
 	service: Service,
 	propertyName: string,
 	initialValue: any,
-	started: boolean
+	locked: boolean
 )
-	validateRegistration(service, propertyName, "Property", started)
+	validateRegistration(service, propertyName, "Property", locked)
 
 	local property = service.KnitComm:CreateProperty(propertyName, initialValue)
 	service.Client[propertyName] = property

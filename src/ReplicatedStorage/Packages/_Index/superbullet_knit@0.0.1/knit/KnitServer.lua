@@ -153,6 +153,7 @@ local ComponentInitializer = Components.ComponentInitializer
 local services: { [string]: Service } = {}
 local started = false
 local startedComplete = false
+local clientExtensionLocked = false -- Separate flag for ClientExtension timing
 local onStartedComplete = Instance.new("BindableEvent")
 
 local function DoesServiceExist(serviceName: string): boolean
@@ -417,7 +418,7 @@ end
 	@return RemoteSignal
 ]=]
 function KnitServer.RegisterClientSignal(service: Service, signalName: string, unreliable: boolean?)
-	return ClientExtension.RegisterClientSignal(service, signalName, unreliable, started)
+	return ClientExtension.RegisterClientSignal(service, signalName, unreliable, clientExtensionLocked)
 end
 
 --[=[
@@ -441,7 +442,7 @@ end
 	@return MethodWrapper
 ]=]
 function KnitServer.RegisterClientMethod(service: Service, methodName: string)
-	return ClientExtension.RegisterClientMethod(service, methodName, started)
+	return ClientExtension.RegisterClientMethod(service, methodName, clientExtensionLocked)
 end
 
 --[=[
@@ -465,7 +466,7 @@ end
 	@return RemoteProperty
 ]=]
 function KnitServer.RegisterClientProperty(service: Service, propertyName: string, initialValue: any)
-	return ClientExtension.RegisterClientProperty(service, propertyName, initialValue, started)
+	return ClientExtension.RegisterClientProperty(service, propertyName, initialValue, clientExtensionLocked)
 end
 
 --[=[
@@ -600,6 +601,10 @@ function KnitServer.Start(options: KnitOptions?)
 			end
 		end
 
+		-- Lock ClientExtension before KnitStart phase begins
+		-- After this point, no new signals/methods/properties can be registered
+		clientExtensionLocked = true
+
 		-- Start:
 		for _, service in services do
 			if type(service.KnitStart) == "function" then
@@ -617,15 +622,19 @@ function KnitServer.Start(options: KnitOptions?)
 			end
 		end)
 
+		-- Expose service remotes to everyone FIRST (before signaling ready)
+		knitRepServiceFolder.Parent = script.Parent
+		
+		-- Set ready attribute so clients know all remotes are registered
+		-- This happens AFTER component.Init() has registered all dynamic items
+		knitRepServiceFolder:SetAttribute("Ready", true)
+
 		startedComplete = true
 		onStartedComplete:Fire()
 
 		task.defer(function()
 			onStartedComplete:Destroy()
 		end)
-
-		-- Expose service remotes to everyone:
-		knitRepServiceFolder.Parent = script.Parent
 	end)
 end
 

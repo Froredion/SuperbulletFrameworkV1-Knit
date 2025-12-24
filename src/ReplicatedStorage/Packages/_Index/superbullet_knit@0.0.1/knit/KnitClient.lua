@@ -154,6 +154,12 @@ local function GetServicesFolder()
 					.. "━━━━━━━━━━━━━━━━━━━━"
 			)
 		end
+		
+		-- Wait for server to signal all remotes (including dynamic ones) are ready
+		-- Use a loop to handle race conditions where attribute might be set between check and wait
+		while not servicesFolder:GetAttribute("Ready") do
+			servicesFolder:GetAttributeChangedSignal("Ready"):Wait()
+		end
 	end
 
 	return servicesFolder
