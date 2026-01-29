@@ -1,7 +1,43 @@
---[[
-	Mutator Component
-	Use this for modifying/updating data and changing state.
+--[[ [AI NOTE] Client Mutator Component (Mutator.lua)
+	Data mutation (setters). Changes state.
 	Examples: UpdatePlayerData, AddToInventory, SaveSettings
+
+	!! All [AI NOTE] comments are guidance for AI code generation only.
+	!! Remove every [AI NOTE] comment (block and inline) from the final code.
+
+	MODULE PATTERN (DOT SYNTAX BY DEFAULT):
+	- This file returns a plain module table (`local module = {}`).
+	- All module-level functions use DOT syntax: `module.FunctionName()`, NOT colon syntax.
+	- Do NOT use `self` in module-level functions.
+
+	OOP IS ALLOWED (when appropriate):
+	- If the logic calls for objects with their own state (e.g., an enemy, a UI widget,
+	  a session tracker), you CAN and SHOULD introduce OOP in this file.
+	- Use a `.new()` constructor on the module table that returns a metatable object:
+	      local MyObject = {}
+	      MyObject.__index = MyObject
+	      function MyObject.new(args)
+	          local self = setmetatable({}, MyObject)
+	          -- set up instance fields
+	          return self
+	      end
+	      function MyObject:SomeMethod()  -- colon syntax + self is CORRECT here
+	      end
+	- Then expose it from the module: `module.MyObject = MyObject` or return it directly.
+	- KEY RULE: colon syntax (`:`) and `self` are ONLY for methods on OOP objects.
+	  The module table itself (`module.X`) always uses dot syntax.
+
+	COMPONENT LIFECYCLE (auto-called by the framework):
+	- `module.Init()` runs first (during KnitInit). Use for setup/wiring.
+	- `module.Start()` runs after (during KnitStart, spawned in a new thread). Use for runtime logic.
+	- Do NOT call Init() or Start() manually.
+
+	SECTION HEADERS:
+	- `---- Utilities`       -> require() modules directly, e.g., `local Utils = require(utilsFolder.Utils)`
+	- `---- Knit Services`   -> declare variables here, fetch in Init() via `Knit.GetService("ServiceName")`
+	- `---- Knit Controllers`-> declare variables here, fetch in Init() via `Knit.GetController("ControllerName")`
+	- `---- Datas`           -> local data/state variables, declared directly
+	- `---- Assets`          -> references to game assets/instances, declared directly
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,9 +54,9 @@ local mouse = plr:GetMouse()
 ---- Utilities
 
 
----- Knit Controllers
+---- Knit Controllers -- [AI NOTE] Declare variables here, assign in Init() via Knit.GetController()
 
----- Knit Services
+---- Knit Services -- [AI NOTE] Declare variables here, assign in Init() via Knit.GetService()
 
 
 ---- Datas
@@ -28,11 +64,11 @@ local mouse = plr:GetMouse()
 
 ---- Assets
 
-function module.Start()
+function module.Start() -- [AI NOTE] Auto-called during KnitStart (new thread). Runtime logic, event connections, loops.
 
 end
 
-function module.Init()
+function module.Init() -- [AI NOTE] Auto-called during KnitInit. Fetch Knit services/controllers and set up references here. Runs before Start().
 
 end
 
