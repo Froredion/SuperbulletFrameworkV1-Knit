@@ -330,6 +330,15 @@ function KnitClient.GetService(serviceName: string): Service
 	-- Warn if GetService is called during initialization and takes too long
 	if not startedComplete then
 		task.spawn(function()
+			local Players = game:GetService("Players")
+			local player = Players.LocalPlayer
+			if not player.Character and Players.CharacterAutoLoads then
+				player.CharacterAdded:Wait()
+			elseif not player.Character then
+				while not player.Character do
+					task.wait(2)
+				end
+			end
 			task.wait(5)
 			if not startedComplete then
 				warn(
