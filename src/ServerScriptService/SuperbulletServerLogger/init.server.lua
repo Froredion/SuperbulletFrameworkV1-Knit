@@ -51,6 +51,11 @@ local httpDisabledEvent = Instance.new("RemoteEvent")
 httpDisabledEvent.Name = "SuperbulletHttpDisabled"
 httpDisabledEvent.Parent = ReplicatedStorage
 
+-- Create RemoteFunction for client-side code queries (path expression evaluator)
+local clientQueryFunction = Instance.new("RemoteFunction")
+clientQueryFunction.Name = "SuperbulletClientQuery"
+clientQueryFunction.Parent = ReplicatedStorage
+
 -- Check if HttpService is enabled
 local function isHttpServiceEnabled()
 	local success, result = pcall(function()
@@ -100,6 +105,11 @@ end
 -- Log buffer
 local logBuffer = {}
 local config = getConfig()
+
+-- WebSocket modules for run_lua_code (cloud mode only)
+local WebSocketClient = require(script.WebSocketClient)
+local CodeExecutor = require(script.CodeExecutor)
+local ClientQueryRouter = require(script.ClientQueryRouter)
 
 -- Build endpoint URL
 -- NOTE: Cloud mode implementation is in Phase 5
@@ -272,6 +282,65 @@ task.spawn(function()
 		end
 	end
 end)
+
+-- Detect execution context from a run_lua_code message.
+-- Returns ("client", strippedCode) or ("server", originalCode).
+local function detectContext(message)
+	-- 1. Explicit context field from backend
+	if message.context == "client" then
+		return "client", message.code
+	end
+
+	-- 2. --@client prefix in code string
+	local code = message.code or ""
+	local stripped = code:match("^%-%-@client%s*(.*)")
+	if stripped then
+		return "client", stripped
+	end
+
+	-- 3. Default: server
+	return "server", code
+end
+
+-- Client query router (initialized once, used by WebSocket handler)
+local clientRouter = ClientQueryRouter.new(clientQueryFunction)
+
+-- WebSocket connection for run_lua_code (cloud mode only)
+-- Connects to the Cloudflare backend so it can push run_lua_code requests directly
+-- to this game instance instead of routing through the plugin's HTTP polling.
+if config.mode == "cloud" and config.cloudToken then
+	local wsClient = WebSocketClient.new(config)
+
+	wsClient:setMessageHandler(function(message)
+		if message.type == "run_lua_code" then
+			-- Wrap in task.spawn so pings are still processed during execution
+			task.spawn(function()
+				local context, code = detectContext(message)
+				local result
+
+				if context == "client" then
+					result = clientRouter:execute(code, message.requestId)
+				else
+					result = CodeExecutor.execute(message.requestId, code)
+				end
+
+				wsClient:sendResponse({
+					type = "run_lua_code_response",
+					requestId = message.requestId,
+					result = result,
+					timestamp = DateTime.now().UnixTimestampMillis,
+				})
+			end)
+		end
+	end)
+
+	wsClient:connect()
+
+	-- Disconnect on game close (registered before log flush BindToClose so it runs first)
+	game:BindToClose(function()
+		wsClient:disconnect()
+	end)
+end
 
 -- Notify playtest stopped on game close
 game:BindToClose(function()
