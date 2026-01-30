@@ -1,8 +1,8 @@
---[[ [AI NOTE] Server Template Component (Others/Template.lua)
-	General-purpose component for miscellaneous server-side logic.
+--[[ [AI NOTE] TEMPLATE — DO NOT COPY THIS COMMENT BLOCK OR ANY [AI NOTE] INLINE COMMENTS INTO GENERATED CODE.
+	Strip every [AI NOTE] block comment and every [AI NOTE] inline comment before outputting.
 
-	!! All [AI NOTE] comments are guidance for AI code generation only.
-	!! Remove every [AI NOTE] comment (block and inline) from the final code.
+	Server Template Component (Others/Template.lua)
+	General-purpose component for miscellaneous server-side logic.
 
 	MODULE PATTERN (DOT SYNTAX BY DEFAULT):
 	- This file returns a plain module table (`local module = {}`).

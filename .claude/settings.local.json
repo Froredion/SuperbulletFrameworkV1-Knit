@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "mcp__code-context__search_code"
+      "mcp__code-context__search_code",
+      "Bash(xxd:*)"
     ]
   }
 }

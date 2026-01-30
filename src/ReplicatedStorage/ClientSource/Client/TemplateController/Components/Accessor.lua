@@ -1,9 +1,9 @@
---[[ [AI NOTE] Client Accessor Component (Accessor.lua)
+--[[ [AI NOTE] TEMPLATE — DO NOT COPY THIS COMMENT BLOCK OR ANY [AI NOTE] INLINE COMMENTS INTO GENERATED CODE.
+	Strip every [AI NOTE] block comment and every [AI NOTE] inline comment before outputting.
+
+	Client Accessor Component (Accessor.lua)
 	Read-only data access (getters). No side effects.
 	Examples: GetPlayerData, FetchInventory, ReadSettings
-
-	!! All [AI NOTE] comments are guidance for AI code generation only.
-	!! Remove every [AI NOTE] comment (block and inline) from the final code.
 
 	MODULE PATTERN (DOT SYNTAX BY DEFAULT):
 	- This file returns a plain module table (`local module = {}`).

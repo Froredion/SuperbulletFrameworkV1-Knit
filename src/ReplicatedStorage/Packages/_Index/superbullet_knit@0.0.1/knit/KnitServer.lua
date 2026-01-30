@@ -37,7 +37,7 @@ type ServerMiddleware = { ServerMiddlewareFn }
 	The middleware tables provided will be used instead of the Knit-level
 	middleware (if any). This allows fine-tuning each service's middleware.
 	These can also be left out or `nil` to not include middleware.
-	
+
 	If `Instance` is provided (typically `script`), Knit will automatically
 	initialize components found in a `Components` folder within that instance.
 ]=]
@@ -191,7 +191,7 @@ end
 		print("MyService initialize")
 	end
 	```
-	
+
 	With automatic component initialization:
 	```lua
 	local MyService = Knit.CreateService {
@@ -486,7 +486,7 @@ end
 		print("Knit started!")
 	end):catch(warn)
 	```
-	
+
 	Example of Knit started with options:
 	```lua
 	Knit.Start({
@@ -524,6 +524,8 @@ function KnitServer.Start(options: KnitOptions?)
 		end
 	end
 
+	local failedServices = {}
+
 	return Promise.new(function(resolve)
 		local knitMiddleware = if selectedOptions.Middleware ~= nil then selectedOptions.Middleware else {}
 
@@ -558,7 +560,7 @@ function KnitServer.Start(options: KnitOptions?)
 			if type(service.KnitInit) == "function" then
 				table.insert(
 					promisesInitServices,
-					Promise.new(function(r, reject)
+					Promise.new(function(r)
 						debug.setmemorycategory(service.Name)
 						local success, err = pcall(function()
 							service:KnitInit()
@@ -566,10 +568,11 @@ function KnitServer.Start(options: KnitOptions?)
 						if success then
 							r()
 						else
+							failedServices[service.Name] = true
 							-- Get the source path using debug.info
 							local source = debug.info(service.KnitInit, "s")
 							local servicePath = source:match("^@?(.+)$") or service.Name
-							reject(
+							task.spawn(error,
 								string.format(
 									"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
 										.. "❌ KnitInit Error in Service: %s\n"
@@ -583,6 +586,7 @@ function KnitServer.Start(options: KnitOptions?)
 									tostring(err)
 								)
 							)
+							r()
 						end
 					end)
 				)
@@ -594,10 +598,14 @@ function KnitServer.Start(options: KnitOptions?)
 		-- Initialize Components (setup and init before KnitStart):
 		local servicesWithComponents = {}
 		for _, service in services do
-			if service.Instance then
-				ComponentInitializer.Initialize(service, service.Instance)
-				table.insert(servicesWithComponents, { service = service, instance = service.Instance })
-				-- service.Instance = nil -- Keep Instance available for runtime access
+			if service.Instance and not failedServices[service.Name] then
+				local ok, err = pcall(ComponentInitializer.Initialize, service, service.Instance)
+				if ok then
+					table.insert(servicesWithComponents, { service = service, instance = service.Instance })
+				else
+					failedServices[service.Name] = true
+					task.spawn(error, "[Knit] ComponentInitializer.Initialize failed for " .. service.Name .. ": " .. tostring(err))
+				end
 			end
 		end
 
@@ -607,10 +615,13 @@ function KnitServer.Start(options: KnitOptions?)
 
 		-- Start:
 		for _, service in services do
-			if type(service.KnitStart) == "function" then
+			if type(service.KnitStart) == "function" and not failedServices[service.Name] then
 				task.spawn(function()
 					debug.setmemorycategory(service.Name)
-					service:KnitStart()
+					local success, err = pcall(service.KnitStart, service)
+					if not success then
+						task.spawn(error, "[Knit] KnitStart error in " .. service.Name .. ": " .. tostring(err))
+					end
 				end)
 			end
 		end
@@ -618,13 +629,16 @@ function KnitServer.Start(options: KnitOptions?)
 		-- Start Components (after all services have started):
 		task.defer(function()
 			for _, data in servicesWithComponents do
-				ComponentInitializer.Start(data.service, data.instance)
+				local ok, err = pcall(ComponentInitializer.Start, data.service, data.instance)
+				if not ok then
+					task.spawn(error, "[Knit] ComponentInitializer.Start failed for " .. data.service.Name .. ": " .. tostring(err))
+				end
 			end
 		end)
 
 		-- Expose service remotes to everyone FIRST (before signaling ready)
 		knitRepServiceFolder.Parent = script.Parent
-		
+
 		-- Set ready attribute so clients know all remotes are registered
 		-- This happens AFTER component.Init() has registered all dynamic items
 		knitRepServiceFolder:SetAttribute("Ready", true)

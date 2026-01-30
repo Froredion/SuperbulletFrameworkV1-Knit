@@ -37,7 +37,7 @@ type PerServiceMiddleware = { [string]: Middleware }
 	.[any] any
 	@within KnitClient
 	Used to define a controller when creating it in `CreateController`.
-	
+
 	If `Instance` is provided (typically `script`), Knit will automatically
 	initialize components found in a `Components` folder within that instance.
 ]=]
@@ -154,7 +154,7 @@ local function GetServicesFolder()
 					.. "━━━━━━━━━━━━━━━━━━━━"
 			)
 		end
-		
+
 		-- Wait for server to signal all remotes (including dynamic ones) are ready
 		-- Use a loop to handle race conditions where attribute might be set between check and wait
 		while not servicesFolder:GetAttribute("Ready") do
@@ -203,7 +203,7 @@ end
 		print("MyController initialized")
 	end
 	```
-	
+
 	With automatic component initialization:
 	```lua
 	local MyController = Knit.CreateController {
@@ -436,6 +436,8 @@ function KnitClient.Start(options: KnitOptions?)
 		selectedOptions.PerServiceMiddleware = {}
 	end
 
+	local failedControllers = {}
+
 	return Promise.new(function(resolve)
 		-- Init:
 		local promisesStartControllers = {}
@@ -444,7 +446,7 @@ function KnitClient.Start(options: KnitOptions?)
 			if type(controller.KnitInit) == "function" then
 				table.insert(
 					promisesStartControllers,
-					Promise.new(function(r, reject)
+					Promise.new(function(r)
 						debug.setmemorycategory(controller.Name)
 						local success, err = pcall(function()
 							controller:KnitInit()
@@ -452,10 +454,25 @@ function KnitClient.Start(options: KnitOptions?)
 						if success then
 							r()
 						else
+							failedControllers[controller.Name] = true
 							-- Get the source path using debug.info
 							local source = debug.info(controller.KnitInit, "s")
 							local controllerPath = source:match("^@?(.+)$") or controller.Name
-							reject(string.format("", controller.Name, controllerPath, tostring(err)))
+							task.spawn(error,
+								string.format(
+									"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+										.. "❌ KnitInit Error in Controller: %s\n"
+										.. "━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+										.. "Controller Path: %s\n"
+										.. "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+										.. "Error: %s\n"
+										.. "━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+									controller.Name,
+									controllerPath,
+									tostring(err)
+								)
+							)
+							r()
 						end
 					end)
 				)
@@ -467,19 +484,26 @@ function KnitClient.Start(options: KnitOptions?)
 		-- Initialize Components (setup and init before KnitStart):
 		local controllersWithComponents = {}
 		for _, controller in controllers do
-			if controller.Instance then
-				ComponentInitializer.Initialize(controller, controller.Instance)
-				table.insert(controllersWithComponents, { controller = controller, instance = controller.Instance })
-				-- controller.Instance = nil -- Keep Instance available for runtime access
+			if controller.Instance and not failedControllers[controller.Name] then
+				local ok, err = pcall(ComponentInitializer.Initialize, controller, controller.Instance)
+				if ok then
+					table.insert(controllersWithComponents, { controller = controller, instance = controller.Instance })
+				else
+					failedControllers[controller.Name] = true
+					task.spawn(error, "[Knit] ComponentInitializer.Initialize failed for " .. controller.Name .. ": " .. tostring(err))
+				end
 			end
 		end
 
 		-- Start:
 		for _, controller in controllers do
-			if type(controller.KnitStart) == "function" then
+			if type(controller.KnitStart) == "function" and not failedControllers[controller.Name] then
 				task.spawn(function()
 					debug.setmemorycategory(controller.Name)
-					controller:KnitStart()
+					local success, err = pcall(controller.KnitStart, controller)
+					if not success then
+						task.spawn(error, "[Knit] KnitStart error in " .. controller.Name .. ": " .. tostring(err))
+					end
 				end)
 			end
 		end
@@ -487,7 +511,10 @@ function KnitClient.Start(options: KnitOptions?)
 		-- Start Components (after all controllers have started):
 		task.defer(function()
 			for _, data in controllersWithComponents do
-				ComponentInitializer.Start(data.controller, data.instance)
+				local ok, err = pcall(ComponentInitializer.Start, data.controller, data.instance)
+				if not ok then
+					task.spawn(error, "[Knit] ComponentInitializer.Start failed for " .. data.controller.Name .. ": " .. tostring(err))
+				end
 			end
 		end)
 

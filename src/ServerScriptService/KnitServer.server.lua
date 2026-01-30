@@ -7,7 +7,10 @@ local Knit = require(KnitModule)
 
 for _, module in pairs(ServerSource.Server:GetDescendants()) do
 	if module:IsA("ModuleScript") and module.Name:match("Service$") then
-		require(module)
+		local ok, err = pcall(require, module)
+		if not ok then
+			task.spawn(error, "[Knit] Failed to load " .. module:GetFullName() .. ": " .. tostring(err))
+		end
 	end
 end
 
