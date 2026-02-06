@@ -4,6 +4,8 @@
 
 local Players = game:GetService("Players")
 
+local PREFIX = "[SuperbulletCodeExecutor]"
+
 local ClientQueryRouter = {}
 ClientQueryRouter.__index = ClientQueryRouter
 
@@ -20,6 +22,7 @@ function ClientQueryRouter:execute(code, requestId)
 	-- Pick the first connected player
 	local players = Players:GetPlayers()
 	if #players == 0 then
+		warn(PREFIX, "No players connected - cannot execute client query")
 		return {
 			success = false,
 			error = "No players connected — cannot execute client query",
@@ -64,6 +67,7 @@ function ClientQueryRouter:execute(code, requestId)
 	task.delay(10, function()
 		if not finished then
 			finished = true
+			warn(PREFIX, "Client query timed out after 10 seconds")
 			clientResult = {
 				success = false,
 				error = "Client query timed out after 10 seconds",
@@ -78,6 +82,7 @@ function ClientQueryRouter:execute(code, requestId)
 
 	-- Validate and normalize the client response
 	if type(clientResult) ~= "table" then
+		warn(PREFIX, "Invalid response from client (expected table, got", type(clientResult), ")")
 		return {
 			success = false,
 			error = "Invalid response from client (expected table, got " .. type(clientResult) .. ")",
@@ -94,6 +99,7 @@ function ClientQueryRouter:execute(code, requestId)
 			},
 		}
 	else
+		warn(PREFIX, "Client query failed:", clientResult.error or "Unknown client error")
 		return {
 			success = false,
 			error = clientResult.error or "Unknown client error",

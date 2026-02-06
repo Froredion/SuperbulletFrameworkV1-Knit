@@ -106,10 +106,46 @@ end
 local logBuffer = {}
 local config = getConfig()
 
--- WebSocket modules for run_lua_code (cloud mode only)
+-- Code executor prefix for consistent debug output
+local CODE_EXECUTOR_PREFIX = "[SuperbulletCodeExecutor]"
+
+-- WebSocket modules for run_lua_code
 local WebSocketClient = require(script.WebSocketClient)
 local CodeExecutor = require(script.CodeExecutor)
 local ClientQueryRouter = require(script.ClientQueryRouter)
+
+-- Check if backend is reachable (mode-dependent: localhost or cloud)
+local function isBackendReachable()
+	local url
+	if config.mode == "cloud" and config.cloudToken then
+		url = "https://superbullet-backend-3948693.superbulletstudios.com/api/superbullet/health"
+	else
+		url = string.format("http://localhost:%d/health", config.port)
+	end
+
+	local success, result = pcall(function()
+		return HttpService:GetAsync(url)
+	end)
+
+	if success then
+		return true
+	else
+		local errorMsg = tostring(result):lower()
+		-- Connection refused or timeout means backend is not running
+		if errorMsg:find("connection refused") or errorMsg:find("connect") or errorMsg:find("timeout") then
+			return false
+		end
+		-- Other errors (like 404) mean the server is running but endpoint doesn't exist
+		-- This is still a valid connection for our purposes
+		return true
+	end
+end
+
+local backendReachable = isBackendReachable()
+if not backendReachable then
+	warn(CODE_EXECUTOR_PREFIX, "Backend not reachable at", config.mode == "cloud" and "cloud backend" or ("localhost:" .. config.port))
+	warn(CODE_EXECUTOR_PREFIX, "Code execution features will not be available until the backend is running")
+end
 
 -- Build endpoint URL
 -- NOTE: Cloud mode implementation is in Phase 5
@@ -305,41 +341,51 @@ end
 -- Client query router (initialized once, used by WebSocket handler)
 local clientRouter = ClientQueryRouter.new(clientQueryFunction)
 
--- WebSocket connection for run_lua_code (cloud mode only)
--- Connects to the Cloudflare backend so it can push run_lua_code requests directly
+-- WebSocket connection for run_lua_code (both localhost and cloud modes)
+-- Connects to the backend so it can push run_lua_code requests directly
 -- to this game instance instead of routing through the plugin's HTTP polling.
-if config.mode == "cloud" and config.cloudToken then
-	local wsClient = WebSocketClient.new(config)
+-- Cloud mode requires cloudToken, localhost mode connects to ws://localhost:port/ws
+local canConnectWebSocket = (config.mode == "cloud" and config.cloudToken) or (config.mode == "localhost")
 
-	wsClient:setMessageHandler(function(message)
-		if message.type == "run_lua_code" then
-			-- Wrap in task.spawn so pings are still processed during execution
-			task.spawn(function()
-				local context, code = detectContext(message)
-				local result
+if canConnectWebSocket then
+	if not backendReachable then
+		warn(CODE_EXECUTOR_PREFIX, "Skipping WebSocket connection - backend not reachable")
+	else
+		local wsClient = WebSocketClient.new(config)
 
-				if context == "client" then
-					result = clientRouter:execute(code, message.requestId)
-				else
-					result = CodeExecutor.execute(message.requestId, code)
-				end
+		wsClient:setMessageHandler(function(message)
+			if message.type == "run_lua_code" then
+				-- Wrap in task.spawn so pings are still processed during execution
+				task.spawn(function()
+					local context, code = detectContext(message)
+					local result
 
-				wsClient:sendResponse({
-					type = "run_lua_code_response",
-					requestId = message.requestId,
-					result = result,
-					timestamp = DateTime.now().UnixTimestampMillis,
-				})
-			end)
+					if context == "client" then
+						result = clientRouter:execute(code, message.requestId)
+					else
+						result = CodeExecutor.execute(message.requestId, code)
+					end
+
+					wsClient:sendResponse({
+						type = "run_lua_code_response",
+						requestId = message.requestId,
+						result = result,
+						timestamp = DateTime.now().UnixTimestampMillis,
+					})
+				end)
+			end
+		end)
+
+		local connected = wsClient:connect()
+		if not connected then
+			warn(CODE_EXECUTOR_PREFIX, "Failed to initiate WebSocket connection")
 		end
-	end)
 
-	wsClient:connect()
-
-	-- Disconnect on game close (registered before log flush BindToClose so it runs first)
-	game:BindToClose(function()
-		wsClient:disconnect()
-	end)
+		-- Disconnect on game close (registered before log flush BindToClose so it runs first)
+		game:BindToClose(function()
+			wsClient:disconnect()
+		end)
+	end
 end
 
 -- Notify playtest stopped on game close

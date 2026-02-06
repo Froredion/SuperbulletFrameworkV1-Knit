@@ -1,11 +1,13 @@
--- AI NOTE: WebSocket client for connecting to the Cloudflare backend during playtesting.
+-- AI NOTE: WebSocket client for connecting to the backend during playtesting.
 -- Handles run_lua_code message routing from the backend to the CodeExecutor.
--- Cloud mode only — in localhost mode there is no WebSocket endpoint.
+-- Cloud mode: connects to wss://superbullet-backend.../api/superbullet/ws?token=TOKEN
+-- Localhost mode: connects to ws://localhost:port/ws
 -- No reconnection logic — if the connection drops, the backend falls back to plugin HTTP polling.
 
 local HttpService = game:GetService("HttpService")
 
-local BACKEND_BASE_URL = "wss://superbullet-backend-3948693.superbulletstudios.com"
+local CLOUD_BACKEND_URL = "wss://superbullet-backend-3948693.superbulletstudios.com"
+local PREFIX = "[SuperbulletCodeExecutor]"
 
 local WebSocketClient = {}
 WebSocketClient.__index = WebSocketClient
@@ -27,8 +29,8 @@ end
 function WebSocketClient:connect()
 	local url = self:_buildWebSocketUrl()
 	if not url then
-		warn("[SuperbulletLogger] WebSocket: Cannot build URL (missing cloudToken)")
-		return
+		warn(PREFIX, "WebSocket: Cannot build URL (missing cloudToken for cloud mode)")
+		return false
 	end
 
 	local success, wsClient = pcall(function()
@@ -38,8 +40,8 @@ function WebSocketClient:connect()
 	end)
 
 	if not success then
-		warn("[SuperbulletLogger] WebSocket: Failed to create client:", wsClient)
-		return
+		warn(PREFIX, "WebSocket: Failed to create client:", wsClient)
+		return false
 	end
 
 	self._wsClient = wsClient
@@ -47,7 +49,6 @@ function WebSocketClient:connect()
 	-- Connection opened
 	table.insert(self._connections, wsClient.Opened:Connect(function(statusCode, headers)
 		self._connected = true
-		print("[SuperbulletLogger] WebSocket: Connected (status " .. tostring(statusCode) .. ")")
 		self:_send({ type = "framework_ready" })
 	end))
 
@@ -58,15 +59,16 @@ function WebSocketClient:connect()
 
 	-- Error
 	table.insert(self._connections, wsClient.Error:Connect(function(statusCode, errorMessage)
-		warn("[SuperbulletLogger] WebSocket error (status " .. tostring(statusCode) .. "):", errorMessage)
+		warn(PREFIX, "WebSocket: Connection error (status", statusCode, "):", errorMessage)
 		self._connected = false
 	end))
 
 	-- Closed
 	table.insert(self._connections, wsClient.Closed:Connect(function()
-		print("[SuperbulletLogger] WebSocket: Closed")
 		self._connected = false
 	end))
+
+	return true
 end
 
 function WebSocketClient:disconnect()
@@ -113,7 +115,7 @@ function WebSocketClient:_send(message)
 	end)
 
 	if not success then
-		warn("[SuperbulletLogger] WebSocket: Failed to send:", err)
+		warn(PREFIX, "WebSocket: Failed to send:", err)
 	end
 end
 
@@ -124,7 +126,7 @@ function WebSocketClient:_handleMessage(data)
 	end)
 
 	if not success then
-		warn("[SuperbulletLogger] WebSocket: Failed to parse message:", data)
+		warn(PREFIX, "WebSocket: Failed to parse message:", data)
 		return
 	end
 
@@ -139,10 +141,15 @@ end
 
 -- Internal: Build the WebSocket URL from config
 function WebSocketClient:_buildWebSocketUrl()
-	if not self._config.cloudToken then
-		return nil
+	if self._config.mode == "cloud" then
+		if not self._config.cloudToken then
+			return nil
+		end
+		return CLOUD_BACKEND_URL .. "/api/superbullet/ws?token=" .. self._config.cloudToken
+	else
+		-- Localhost mode
+		return string.format("ws://localhost:%d/ws", self._config.port or 13528)
 	end
-	return BACKEND_BASE_URL .. "/api/superbullet/ws?token=" .. self._config.cloudToken
 end
 
 return WebSocketClient
