@@ -27,13 +27,13 @@
 	  The module table itself (`module.X`) always uses dot syntax.
 
 	COMPONENT LIFECYCLE (auto-called by the framework):
-	- `module.Init()` runs first (during KnitInit). Use for setup/wiring.
-	- `module.Start()` runs after (during KnitStart, spawned in a new thread). Use for runtime logic.
+	- `module.Init()` runs first (during SuperbulletInit). Use for setup/wiring.
+	- `module.Start()` runs after (during SuperbulletStart, spawned in a new thread). Use for runtime logic.
 	- Do NOT call Init() or Start() manually.
 
 	SECTION HEADERS:
 	- `---- Utilities`     -> require() modules directly, e.g., `local Utils = require(utilsFolder.Utils)`
-	- `---- Knit Services` -> declare variables here, fetch in Init() via `Knit.GetService("ServiceName")`
+	- `---- Superbullet Services` -> declare variables here, fetch in Init() via `Superbullet.GetService("ServiceName")`
 	- `---- Components`    -> sibling components, fetch in Init() via parent service,
 	                          e.g., `local Accessor = TemplateService.Components["Accessor"]`
 	- `---- Datas`         -> local data/state variables, declared directly
@@ -45,7 +45,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local MarketplaceService = game:GetService("MarketplaceService")
-local Knit = require(ReplicatedStorage.Packages.Knit)
+local Superbullet = require(ReplicatedStorage.Packages.Superbullet)
 local Signal = require(ReplicatedStorage.Packages.Signal)
 local module = {}
 
@@ -53,7 +53,7 @@ local module = {}
 local utilsFolder = ReplicatedStorage.SharedSource.Utilities
 
 
----- Knit Services -- [AI NOTE] Declare variables here, assign in Init() via Knit.GetService()
+---- Superbullet Services -- [AI NOTE] Declare variables here, assign in Init() via Superbullet.GetService()
 
 
 ---- Components -- [AI NOTE] Declare variables here, assign in Init() via parent service's .Components["Name"]
@@ -66,11 +66,11 @@ local utilsFolder = ReplicatedStorage.SharedSource.Utilities
 
 
 
-function module.Start() -- [AI NOTE] Auto-called during KnitStart (new thread). Runtime logic, event connections, loops.
+function module.Start() -- [AI NOTE] Auto-called during SuperbulletStart (new thread). Runtime logic, event connections, loops.
 
 end
 
-function module.Init() -- [AI NOTE] Auto-called during KnitInit. Fetch Knit services and set up references here. Runs before Start().
+function module.Init() -- [AI NOTE] Auto-called during SuperbulletInit. Fetch Superbullet services and set up references here. Runs before Start().
 
 end
 
