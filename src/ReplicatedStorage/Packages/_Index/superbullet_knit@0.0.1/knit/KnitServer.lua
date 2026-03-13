@@ -272,6 +272,19 @@ function KnitServer.GetService(serviceName: string): Service
 
 	-- Warn if GetService is called during initialization and takes too long
 	if not startedComplete then
+		local callerLocation = "unknown"
+		for level = 2, 20 do
+			local source = debug.info(level, "s")
+			if not source then break end
+			local cleanSource = source:match("^@?(.+)$") or source
+			if not cleanSource:find("knit") and not cleanSource:find("promise") and not cleanSource:find("Knit") and not cleanSource:find("Promise") then
+				local line = debug.info(level, "l")
+				local name = debug.info(level, "n")
+				callerLocation = cleanSource .. ":" .. tostring(line)
+					.. (if name and name ~= "" then " function " .. name else "")
+				break
+			end
+		end
 		task.spawn(function()
 			task.wait(5)
 			if not startedComplete then
@@ -283,6 +296,8 @@ function KnitServer.GetService(serviceName: string): Service
 							.. "GetService('%s') called during initialization, and Superbullet has been\n"
 							.. "initializing for more than 5 seconds.\n"
 							.. "\n"
+							.. "Called from: %s\n"
+							.. "\n"
 							.. "Possible causes:\n"
 							.. "• Service '%s' does not exist\n"
 							.. "• A SuperbulletInit or component Init() is yielding\n"
@@ -293,6 +308,7 @@ function KnitServer.GetService(serviceName: string): Service
 							.. "   to find any other warnings or errors that might be the cause.\n"
 							.. "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
 						serviceName,
+						callerLocation,
 						serviceName
 					)
 				)
