@@ -113,6 +113,15 @@ local selectedOptions = nil
 ]=]
 local KnitServer = {}
 
+--- Set to true to enable [INITDBG] initialization profiling prints
+KnitServer.DebugInit = false
+
+local function dbg(...)
+	if KnitServer.DebugInit then
+		print("[INITDBG]", ...)
+	end
+end
+
 --[=[
 	@prop Util Folder
 	@within SuperbulletServer
@@ -543,6 +552,9 @@ function KnitServer.Start(options: KnitOptions?)
 	local failedServices = {}
 
 	return Promise.new(function(resolve)
+		-- Sync debug flag to ComponentInitializer
+		ComponentInitializer.DebugInit = KnitServer.DebugInit
+		dbg("Start() Promise began at", os.clock())
 		local knitMiddleware = if selectedOptions.Middleware ~= nil then selectedOptions.Middleware else {}
 
 		-- Bind remotes:
@@ -571,6 +583,7 @@ function KnitServer.Start(options: KnitOptions?)
 		end
 
 		-- Init:
+		dbg("Remotes bound, starting service Init phase at", os.clock())
 		local promisesInitServices = {}
 		for _, service in services do
 			local initFn = service.SuperbulletInit or service.KnitInit
@@ -579,9 +592,11 @@ function KnitServer.Start(options: KnitOptions?)
 					promisesInitServices,
 					Promise.new(function(r)
 						debug.setmemorycategory(service.Name)
+						dbg(">>> Service Init START:", service.Name, "at", os.clock())
 						local success, err = pcall(function()
 							initFn(service)
 						end)
+						dbg("<<< Service Init END:", service.Name, "at", os.clock(), if success then "OK" else "FAIL: " .. tostring(err))
 						if success then
 							r()
 						else
@@ -612,11 +627,14 @@ function KnitServer.Start(options: KnitOptions?)
 
 		resolve(Promise.all(promisesInitServices))
 	end):andThen(function()
+		dbg("All service Inits resolved, starting Component Init phase at", os.clock())
 		-- Initialize Components (setup and init before SuperbulletStart):
 		local servicesWithComponents = {}
 		for _, service in services do
 			if service.Instance and not failedServices[service.Name] then
+				dbg(">>> ComponentInitializer.Initialize START:", service.Name, "at", os.clock())
 				local ok, err = pcall(ComponentInitializer.Initialize, service, service.Instance)
+				dbg("<<< ComponentInitializer.Initialize END:", service.Name, "at", os.clock())
 				if ok then
 					table.insert(servicesWithComponents, { service = service, instance = service.Instance })
 				else
