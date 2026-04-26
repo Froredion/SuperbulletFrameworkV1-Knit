@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "mcp__code-context__search_code",
-      "Bash(xxd:*)"
+      "Bash(xxd:*)",
+      "WebFetch(domain:docs.superbulletstudios.com)"
     ]
   }
 }
