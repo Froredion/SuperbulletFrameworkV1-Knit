@@ -1,3 +1,9 @@
+-- Wait once for initial replication so controller and Components discovery below
+-- sees the full tree (no per-module waits needed)
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ClientSource = ReplicatedStorage:WaitForChild("ClientSource")
 local SuperbulletModule = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Superbullet")
