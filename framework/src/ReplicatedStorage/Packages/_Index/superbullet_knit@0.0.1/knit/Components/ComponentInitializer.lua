@@ -26,14 +26,17 @@ end
 	@param instance Instance -- The instance containing the Components folder
 ]=]
 function ComponentInitializer.Initialize(serviceOrController, instance: Instance)
-	local componentsFolder = instance:WaitForChild("Components", 1)
+	-- FindFirstChild, not WaitForChild: the module tree is already loaded by the time
+	-- Knit starts, and a timed wait would stall startup for every service/controller
+	-- without a Components (or Others) folder
+	local componentsFolder = instance:FindFirstChild("Components")
 	if not componentsFolder then
 		return
 	end
 
 	-- Step 1: Set up Components table and utility functions
 	dbg("  Step1: setup START for", instance:GetFullName(), "at", os.clock())
-	local othersFolder = componentsFolder:WaitForChild("Others", 1)
+	local othersFolder = componentsFolder:FindFirstChild("Others")
 	if othersFolder then
 		serviceOrController.Components = {}
 		for _, v in pairs(othersFolder:GetDescendants()) do
@@ -97,7 +100,7 @@ end
 	@param instance Instance -- The instance containing the Components folder
 ]=]
 function ComponentInitializer.Start(serviceOrController, instance: Instance)
-	local componentsFolder = instance:WaitForChild("Components", 1)
+	local componentsFolder = instance:FindFirstChild("Components")
 	if not componentsFolder then
 		return
 	end
